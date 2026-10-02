@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import functools
 import sqlite3
-import unicodedata
 from collections.abc import Iterable
 from typing import Any, Literal, cast
 
 from .storage import DOWNLOAD_TIMEOUT, Storage
+#from collections import defaultdict
+from itertools import groupby
+
 
 POS = Literal["noun", "verb", "adj", "adv", "adp", "unk", "conj", "nref"]
 
@@ -57,12 +59,19 @@ _SQL_CONCEPTS_BY_LEXEME = """
 
 _SQL_RELATION_TYPE = "SELECT rowid FROM relation_types WHERE type = ?"
 
-_SQL_RELATED = """
+_SQL_SPEC_RELATED = """
     SELECT synsets.rowid AS rowid, LOWER(synsets.pos) AS pos, synsets.ili AS ili
     FROM synset_relations
     JOIN synsets ON synsets.rowid = synset_relations.target_rowid
     WHERE synset_relations.source_rowid = ? AND synset_relations.type_rowid = ?
     ORDER BY synsets.rowid ASC
+"""
+
+_SQL_ALL_RELATED = """
+    SELECT synsets.rowid AS rowid, LOWER(synsets.pos) AS pos, synsets.ili AS ili, relation_types.type AS type
+    FROM synset_relations
+    JOIN synsets ON synsets.rowid = synset_relations.target_rowid
+    JOIN relation_types ON  relation_types.rowid = synset_relations.type_rowid
 """
 
 #-------- lexemes
@@ -208,7 +217,7 @@ def _assemble_where(
     contains: str | None = None,
 ) -> tuple[str, tuple[object, ...]]:
     """Append JOIN forms and WHERE conditions to base_sql."""
-    langs = [langs] if isinstance(langs, str) else list(langs) if langs is not None else None
+    langs = [langs] if isinstance(langs, str) else list(langs) if langs is not None else None    
     needs_forms = form is not None or startswith is not None or contains is not None
     sql = base_sql + (" JOIN forms ON forms.entry_rowid = entries.rowid" if needs_forms else "")
 
@@ -231,12 +240,13 @@ def _assemble_where(
     if pos:
         conditions.append("LOWER(synsets.pos) = LOWER(?)")
         params.append(pos)
-
+    
     if conditions:
         sql += " WHERE " + " AND ".join(conditions)
     return sql, tuple(params)
-    
+ 
 
+    
 # ---------------------------------------------------------------------------
 # Shortcuts to query the database
 # ---------------------------------------------------------------------------
@@ -366,7 +376,7 @@ class Concept:
 
     def _related(self, relation_name: str) -> list[Concept]:
         type_rowid = _relation_type_cached(str(self._storage.path), self._storage, relation_name)
-        rows = _select(self._storage, _SQL_RELATED, (self._rowid, type_rowid))
+        rows = _select(self._storage, _SQL_SPEC_RELATED, (self._rowid, type_rowid))
         return [Concept(row, self._storage) for row in rows]
 
     def hypernyms(self) -> list[Concept]:
@@ -379,13 +389,31 @@ class Concept:
 
     def meronyms(self) -> list[Concept]:
         """Returns concepts that are connected to this concept by a meronymy relation."""
-        return self._related("mero_part")#meronym?
+        return self._related("meronym")
 
     def holonyms(self) -> list[Concept]:
         """Returns concepts that are connected to this concept by a holonymy relation."""
-        return self._related("holo_part")#holonym?
+        return self._related("holonym")
+        
+    def get_related (self, relations:list[str] | str | None = None) -> dict[str, list[Concept]]:
+        """Returns a dictionary of all concepts related by that concept by any relation or any specified relation."""
 
+        rel_dic = {}   
+        sql = _SQL_ALL_RELATED
+        rel_conditions = " WHERE synset_relations.source_rowid = ?"
+        rel_params = [self._rowid]
+        if relations:
+            rel_placeholders = ",".join("?" * len(relations)) 
+            rel_conditions += f" AND relation_types.type IN ({rel_placeholders})"
+            rel_params.extend(relations)
+      
+        rows = _select(self._storage, sql + rel_conditions + " ORDER BY synsets.rowid ASC", rel_params)
+        rel_dic = {key: [Concept(row, self._storage) for row in group] for key, group in groupby(sorted(rows, key=lambda x: x[-1]), key=lambda x: x[-1])}
 
+        return rel_dic
+       
+        
+    
 class Sense:
     """A pairing of a lexeme with a concept."""
 
@@ -439,8 +467,7 @@ class Sense:
             )
             for row in rows
         ]
-
-             
+         
             
 
     def concept(self) -> Concept:

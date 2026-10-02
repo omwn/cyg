@@ -103,7 +103,7 @@ for item in c:
 ```
 
 
-**Finding semantically related concepts**
+**Finding specific related concepts**
 
 ```python
 c = cyg.concepts(form="cheek", langs="en")
@@ -117,6 +117,26 @@ Available relationships:
 - hyponymy: `a.hyponyms()`
 - meronymy: `a.meronyms()`
 - holonymy: `a.holonyms()`
+
+
+**Finding all related concepts**
+```python
+c = cyg.concepts(form="leave", langs="en")
+for a in c:
+    all_related = a.get_related()
+    print(all_related)
+```
+
+One or more relationships can also be specified to restrict the results.
+
+
+```python
+c = cyg.concepts(form="book", langs="en")
+for a in c:     
+     g= a.get_related(['mero_member','mero_part'])
+     print (g)
+```
+
 
 **Retrieving senses from concepts**
 
@@ -455,6 +475,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Upstream
 
+- Online repository: https://github.com/omwn/cyg
 - Cygnet database: https://github.com/omwn/cygnet
 - Online interface: https://cygnet.maudslay.eu/
 

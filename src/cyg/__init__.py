@@ -32,7 +32,7 @@ from .core import (
 )
 from .storage import DatabaseError, DatabaseNotFoundError, DownloadError
 
-__version__ = "0.0.1b1.post4"
+__version__ = "0.0.1b1.post5"
 
 __all__ = [
     "AnnotatedString",

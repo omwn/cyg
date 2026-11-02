@@ -46,9 +46,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/smpouli/cygnet_python_package"
-Repository = "https://github.com/smpouli/cygnet_python_package"
-Documentation = "https://github.com/smpouli/cygnet_python_package/blob/main/README.md"
+Repository = "https://github.com/omwn/cyg"
+Cygnet database: https://github.com/omwn/cygnet
 Online-interface = "https://cygnet.maudslay.eu/"
 
 [tool.hatch.version]

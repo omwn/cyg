@@ -10,8 +10,8 @@ Basic usage::
 
     from cyg import Cygnet
 
-    cyg = Cygnet()
-    concepts = cyg.concepts(form="cheek", langs="en")
+    db = Cygnet()
+    concepts = db.concepts(form="cheek", langs="en")
     for concept in concepts:
         print(concept.index(), concept.pos())
         for sense in concept.senses("en"):
@@ -32,7 +32,11 @@ from .core import (
 )
 from .storage import DatabaseError, DatabaseNotFoundError, DownloadError
 
-__version__ = "0.0.1b1.post5"
+import requests
+
+
+
+__version__ = "0.0.1b1.post6"
 
 __all__ = [
     "AnnotatedString",
@@ -47,3 +51,34 @@ __all__ = [
     "__version__",
 ]
 
+
+
+def releases() -> list[str]:
+    """Return the tags of the releases available upstream, newest first.       
+
+    Returns:
+        The release tags, e.g. ``["2026.05.12", "2026.03.01", ...]``.
+
+    Raises:
+        DownloadError: If the releases cannot be listed.
+    """
+    url = "https://api.github.com/repos/omwn/cygnet/tags"
+    tags = []
+    page = 1
+
+    while True:
+        response = requests.get(
+            url,
+            params={"per_page": 100, "page": page},
+            timeout=300,
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        if not data:
+            break
+
+        tags.extend(tag["name"] for tag in data)
+        page += 1
+
+    return tags

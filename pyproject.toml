@@ -47,7 +47,7 @@ dev = [
 
 [project.urls]
 Repository = "https://github.com/omwn/cyg"
-Cygnet database: https://github.com/omwn/cygnet
+Cygnet database = "https://github.com/omwn/cygnet"
 Online-interface = "https://cygnet.maudslay.eu/"
 
 [tool.hatch.version]

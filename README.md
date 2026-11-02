@@ -17,10 +17,10 @@ Requires Python 3.9+.
 ```python
 from cyg import Cygnet
 
-cyg = Cygnet() 
+db = Cygnet() 
 
 ```
-Note : Cygnet() automatically installs the the latest version of the database the first time you use it. 
+Note : Cygnet() automatically installs the the latest version of the database the first time you use it. Once it is done, it will always check for a new release of the database and downloads it automatically.
 
 
 ## Use Cases
@@ -30,57 +30,57 @@ Note : Cygnet() automatically installs the the latest version of the database th
 **Counting all concepts**
 
 ```python
-c = cyg.concepts()
+c = db.concepts()
 print(len(c))
 ```
 
 **Filtering concepts by POS**
 
 ```python
-c = cyg.concepts(pos="noun")
+c = db.concepts(pos="noun")
 ```
 
 **Filtering concepts by language(s)**
 
 ```python
-c = cyg.concepts(langs="it")
+c = db.concepts(langs="it")
 ```
 
 **Filtering concepts by form (exact match)**
 
 ```python
-c = cyg.concepts(form="bal")
+c = db.concepts(form="bal")
 ```
 
 **Filtering concepts by form (partial match)**
 
 ```python
-c = cyg.concepts(contains="bal")
-c = cyg.concepts(startswith="ball")
+c = db.concepts(contains="bal")
+c = db.concepts(startswith="ball")
 ```
 
 
 **Filtering concepts by POS and language(s)**
 ```python
-c = cyg.concepts(pos="adv", langs="it")
+c = db.concepts(pos="adv", langs="it")
 ```
 
 **Filtering concepts by form and language(s)**
 ```python
-c = cyg.concepts(form="bal", langs="nl")
+c = db.concepts(form="bal", langs="nl")
 ```
 
 **Filtering concepts by form, POS and language(s)**
 
 ```python
-c = cyg.concepts(form="bal", pos="noun", langs="fr")
+c = db.concepts(form="bal", pos="noun", langs="fr")
 ```
 
 
 **Displaying the POS of a specific concept**
 
 ```python
-c = cyg.concepts(form="bal")
+c = db.concepts(form="bal")
 for a in c:
     print(a.pos())
 ```
@@ -88,7 +88,7 @@ for a in c:
 **Displaying the index of a specific concept**
 
 ```python
-c = cyg.concepts(form="bal")
+c = db.concepts(form="bal")
 for a in c:
     print(a.index())
 ```
@@ -96,7 +96,7 @@ for a in c:
 **Displaying available definitions of a concept**
 
 ```python
-c = cyg.concepts(form="bal")
+c = db.concepts(form="bal")
 for item in c:
     f = item.definition("en")
     print(f.text())
@@ -106,7 +106,7 @@ for item in c:
 **Finding specific related concepts**
 
 ```python
-c = cyg.concepts(form="cheek", langs="en")
+c = db.concepts(form="cheek", langs="en")
 for a in c:
     rel = a.hypernyms()
     print(rel)
@@ -121,7 +121,7 @@ Available relationships:
 
 **Finding all related concepts**
 ```python
-c = cyg.concepts(form="leave", langs="en")
+c = db.concepts(form="leave", langs="en")
 for a in c:
     all_related = a.get_related()
     print(all_related)
@@ -131,9 +131,9 @@ One or more relationships can also be specified to restrict the results.
 
 
 ```python
-c = cyg.concepts(form="book", langs="en")
+c = db.concepts(form="book", langs="en")
 for a in c:     
-     g= a.get_related(['mero_member','mero_part'])
+     g = a.get_related(['mero_member','mero_part'])
      print (g)
 ```
 
@@ -141,7 +141,7 @@ for a in c:
 **Retrieving senses from concepts**
 
 ```python
-c = cyg.concepts(form="cheek", langs="en")
+c = db.concepts(form="cheek", langs="en")
 for a in c:
     senses = a.senses("en")
     print(a, senses)
@@ -150,7 +150,7 @@ for a in c:
 **Retrieving lexemes from concepts**
 
 ```python
-c = cyg.concepts(form="repair", langs="en")
+c = db.concepts(form="repair", langs="en")
 for a in c:
     words = a.lexemes("en")
     print(a, words)
@@ -163,43 +163,43 @@ for a in c:
 **Counting all lexemes**
 
 ```python
-c = cyg.lexemes()
+c = db.lexemes()
 print(len(c))
 ```
 
 **Filtering lexemes by form (exact match)**
 
 ```python
-c = cyg.lexemes(form="but")
+c = db.lexemes(form="but")
 print(len(c))
 ```
 
 **Filtering lexemes by form (partial match)**
 
 ```python
-c = cyg.lexemes(contains="but")
-d = cyg.lexemes(startswith="but")
+c = db.lexemes(contains="but")
+d = db.lexemes(startswith="but")
 print(len(c), len(d))
 ```
 
 **Filtering lexemes by language(s)**
 
 ```python
-c = cyg.lexemes(langs=["en", "fr"])
+c = db.lexemes(langs=["en", "fr"])
 print(len(c))
 ```
 
 **Filtering lexemes by form and language(s)**
 
 ```python
-c = cyg.lexemes(form="but",langs=["en", "fr"])
+c = db.lexemes(form="but",langs=["en", "fr"])
 print(c)
 ```
 
 **Finding the index of a lexeme**
 
 ```python
-c = cyg.lexemes(form="cheek", langs="en")
+c = db.lexemes(form="cheek", langs="en")
 for w in c:
     print (w.index())
 ```
@@ -207,7 +207,7 @@ for w in c:
 **Finding the language of a lexeme**
 
 ```python
-c = cyg.lexemes(form="sudden")
+c = db.lexemes(form="sudden")
 for w in c:
     print (w.lang())
 ```
@@ -215,7 +215,7 @@ for w in c:
 **Displaying the lemma of a lexeme**
 
 ```python
-c = cyg.lexemes(form="been")
+c = db.lexemes(form="been")
 for w in c:
     print(w.lemma())
 ```
@@ -223,7 +223,7 @@ for w in c:
 **Finding all forms of a lexeme**
 
 ```python
-c = cyg.lexemes(form="been")
+c = db.lexemes(form="been")
 for w in c:
     print(w.all_forms())
 ```
@@ -231,7 +231,7 @@ for w in c:
 **Retrieving the concepts related to a lexeme**
 
 ```python
-c = cyg.lexemes(form="pray")
+c = db.lexemes(form="pray")
 for w in c:
     print(w.concepts())
 ```
@@ -239,7 +239,7 @@ for w in c:
 **Retrieving the senses related to a lexeme**
 
 ```python
-c = cyg.lexemes(form="pray")
+c = db.lexemes(form="pray")
 for w in c:
     print(w.senses())
 ```
@@ -250,22 +250,22 @@ for w in c:
 
 **Counting all senses**
 ```python
-c = cyg.senses()
+c = db.senses()
 print(len(c))
 ```
 
 **Filtering senses by form (exact match)**
 
 ```python
-c = cyg.senses(form="chaos")
+c = db.senses(form="chaos")
 print(c)
 ```
 
 **Filtering senses by form (partial match)**
 
 ```python
-c = cyg.senses(contains="chaos")
-d = cyg.senses(startswith="chaos")
+c = db.senses(contains="chaos")
+d = db.senses(startswith="chaos")
 print(c, d)
 ```
 
@@ -273,14 +273,14 @@ print(c, d)
 **Filter senses by language(s)**
 
 ```python
-c = cyg.senses(langs=["en", "fr"])
+c = db.senses(langs=["en", "fr"])
 print(len(c))
 ```
 
 **Filter senses by form and language(s)**
 
 ```python
-c = cyg.senses(form="chaos", langs=["en", "fr"])
+c = db.senses(form="chaos", langs=["en", "fr"])
 print(c)
 ```
 
@@ -288,7 +288,7 @@ print(c)
 **Displaying the index of a sense**
 
 ```python
-c = cyg.senses(form="chaos", langs=["en", "fr"])
+c = db.senses(form="chaos", langs=["en", "fr"])
 for b in c:
     print(b, b.index())
 ```
@@ -296,7 +296,7 @@ for b in c:
 **Displaying available examples and offsets of a sense**
 
 ```python
-c = cyg.senses(form="plain")
+c = db.senses(form="plain")
 
 for sense in c:
     for example in sense.examples():
@@ -306,7 +306,7 @@ for sense in c:
 **Retrieving the concept related to a sense**
 
 ```python
-c = cyg.senses(form="chaos", langs=["en"])
+c = db.senses(form="chaos", langs=["en"])
 for b in c:
     print(b, b.concept())
 ```
@@ -314,7 +314,7 @@ for b in c:
 **Retrieving the lexeme related to a sense**
 
 ```python
-c = cyg.senses(form="chaos")
+c = db.senses(form="chaos")
 for b in c:
     print(b, b.lexeme())
 ```
@@ -324,7 +324,7 @@ for b in c:
 **Displaying all languages included in the database**
 
 ```python
-c = cyg.langs()
+c = db.langs()
 
 print (c)
 ```
@@ -359,32 +359,17 @@ Cygnet can install and manage multiple releases side by side. By default, all do
 from cyg import Cygnet
 
 cyg = Cygnet(version="2026.05.12")
-print(cyg.current_version())  # "2026.05.12"
+
 ```
 
 **Listing available releases:**
 
 ```python
-from cyg import Cygnet
+import cyg
 
-cyg = Cygnet(version="2026.05.12")
 for tag in cyg.releases():
-    print(tag)  # "2026.05.12", "2026.03.01", ...
+    print(tag)  # "2026.05.12", "2026.03.15", ...
 ```
-
-**Upgrading:**
-
-```python
-# Upgrade to latest
-cyg.upgrade()
-
-# Upgrade to a specific version
-cyg.upgrade(version="2026.05.12")
-```
-
-When `version=` is passed to `Cygnet()`, the database is stored in a versioned subdirectory (`<cache>/cyg/<tag>/cygnet.db`) so that multiple releases coexist. When `upgrade()` is called, the instance is repointed to the new versioned directory; the old version remains on disk and can be reused by constructing `Cygnet(version="old_version")`.
-
-If no `version=` is passed and no database exists yet, `upgrade()` installs the latest release.
 
 
 ### Cygnet
@@ -401,11 +386,8 @@ cyg = Cygnet(db_path: str | None = None, *, download: bool = True, version: str 
 | `concept(ili)` | Get a single concept by its ILI identifier (e.g., "i46360") |
 | `senses(form, langs, startswith, contains)` | Find senses by word form, language, prefix, or substring |
 | `lexemes(form, langs, startswith, contains)` | Find lexemes by word form, language, prefix, or substring |
-| `langs()` | Return sorted list of all language codes in the database |
-| `releases()` | List all available release tags (newest first) |
-| `latest_version()` | Get the latest release tag from GitHub |
-| `current_version()` | Get the release tag of the installed database |
-| `upgrade(version=None, timeout=300)` | Upgrade to a specific version or the latest |
+| `langs()` | Return a dictionary mapping the languages featured in the database to their ISO language codes|
+
 
 **Filter parameters:**
 - `form`: exact match
@@ -425,8 +407,9 @@ A language-independent concept (synset).
 | `index()` | `str` | ILI identifier (e.g., "i46360") |
 | `pos()` | `POS` | Part of speech |
 | `definition(lang="en")` | `AnnotatedString \| None` | Definition in given language |
-| `senses(lang=None)` | `list[Sense]` | All senses, optionally filtered by language |
-| `lexemes(lang=None)` | `list[Lexeme]` | All lexemes, optionally filtered by language |
+| `senses(langs=None)` | `list[Sense]` | All senses, optionally filtered by language(s) |
+| `lexemes(langs=None)` | `list[Lexeme]` | All lexemes, optionally filtered by language(s) |
+| `get_related()` | `dict[str, list[Concept]]` | Dictionary of all concepts related by that concept by any relation or any specified relationMore general concepts |
 | `hypernyms()` | `list[Concept]` | More general concepts |
 | `hyponyms()` | `list[Concept]` | More specific concepts |
 | `meronyms()` | `list[Concept]` | Part-of relations |

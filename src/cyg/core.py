@@ -8,7 +8,6 @@ from collections.abc import Iterable
 from typing import Any, Literal, cast
 
 from .storage import DOWNLOAD_TIMEOUT, Storage
-#from collections import defaultdict
 from itertools import groupby
 
 
@@ -79,7 +78,7 @@ _SQL_ALL_RELATED = """
 _SQL_LEXEMES = """
     SELECT DISTINCT entries.rowid AS rowid,
            languages.code AS lang,
-           (SELECT normalized_form FROM forms
+           (SELECT form FROM forms
              WHERE forms.entry_rowid = entries.rowid AND forms.rank = 0
              LIMIT 1) AS lemma
     FROM entries
@@ -89,7 +88,7 @@ _SQL_LEXEMES = """
 _SQL_LEXEMES_BY_CONCEPT = """
     SELECT DISTINCT senses.entry_rowid AS rowid,
            languages.code AS lang,
-           (SELECT normalized_form FROM forms
+           (SELECT form FROM forms
              WHERE forms.entry_rowid = senses.entry_rowid AND forms.rank = 0
              LIMIT 1) AS lemma
     FROM senses
@@ -101,7 +100,7 @@ _SQL_LEXEMES_BY_CONCEPT = """
 _SQL_LEXEME_BY_ENTRY = """
     SELECT entries.rowid AS rowid,
            languages.code AS lang,
-           (SELECT normalized_form FROM forms
+           (SELECT form FROM forms
              WHERE forms.entry_rowid = entries.rowid AND forms.rank = 0
              LIMIT 1) AS lemma
     FROM entries
@@ -110,7 +109,7 @@ _SQL_LEXEME_BY_ENTRY = """
 """
 
 _SQL_LEMMA_BY_ENTRY = """
-    SELECT normalized_form AS lemma
+    SELECT form AS lemma
     FROM forms
     WHERE forms.entry_rowid = ? AND forms.rank = 0
     ORDER BY forms.rowid LIMIT 1
@@ -120,7 +119,7 @@ _SQL_FORMS_BY_ENTRY = """
     SELECT form AS form
     FROM forms
     WHERE forms.entry_rowid = ?
-    ORDER BY form ASC
+    ORDER BY rank ASC
 """
 
 
@@ -190,7 +189,13 @@ _SQL_EXAMPLES = """
 """
 
 #-------- languages
-_SQL_LANGUAGES = "SELECT code FROM languages ORDER BY code"
+_SQL_LANGUAGES = "SELECT code, name FROM languages ORDER BY code"
+
+_SQL_LANG_CHECK = """
+    SELECT code FROM languages
+    WHERE languages.code = ?
+"""
+
 
 _SQL_LANGUAGE_BY_ENTRY = """
     SELECT languages.code AS lang
@@ -202,6 +207,7 @@ _SQL_LANGUAGE_BY_ENTRY = """
 
 _Params = Iterable[Any]
 
+   
 
 # ---------------------------------------------------------------------------
 # Function for queries containing optional elements
@@ -216,7 +222,7 @@ def _assemble_where(
     startswith: str | None = None,
     contains: str | None = None,
 ) -> tuple[str, tuple[object, ...]]:
-    """Append JOIN forms and WHERE conditions to base_sql."""
+    """Appends JOIN forms and WHERE conditions to base_sql."""
     langs = [langs] if isinstance(langs, str) else list(langs) if langs is not None else None    
     needs_forms = form is not None or startswith is not None or contains is not None
     sql = base_sql + (" JOIN forms ON forms.entry_rowid = entries.rowid" if needs_forms else "")
@@ -233,20 +239,20 @@ def _assemble_where(
     if contains is not None:
         conditions.append("forms.form LIKE ?")
         params.append("%" + contains + "%")
-    if langs:
+    if langs:   
         placeholders = ",".join("?" * len(langs))
         conditions.append(f"languages.code IN ({placeholders})")
         params.extend(langs)
     if pos:
+        if pos not in POS:
+            raise ValueError(f"Invalid part-of-speech (pos) tag: {pos!r}")
         conditions.append("LOWER(synsets.pos) = LOWER(?)")
         params.append(pos)
     
     if conditions:
         sql += " WHERE " + " AND ".join(conditions)
     return sql, tuple(params)
- 
 
-    
 # ---------------------------------------------------------------------------
 # Shortcuts to query the database
 # ---------------------------------------------------------------------------
@@ -263,7 +269,6 @@ def _select_one(storage: Storage, sql: str, params: _Params = ()) -> sqlite3.Row
     if result is None:
         return None
     return cast("sqlite3.Row", result)
-
 
 
 
@@ -302,6 +307,20 @@ def _lexeme_cached(db_path: str, storage: Storage, entry_rowid: int) -> sqlite3.
 
 
 # ---------------------------------------------------------------------------
+# Language code validation
+# ---------------------------------------------------------------------------
+
+def _valid_lang_code(lang_var,db_connect):
+    """Checks whether the language ISO code is valid """
+    if lang_var is not None:
+        lang_var = [lang_var] if isinstance(lang_var, str) else list(lang_var)
+        for lang in lang_var:
+            checked =_select_one(db_connect, _SQL_LANG_CHECK, (lang,))
+            if checked is None:
+                raise ValueError(f"Invalid language ISO code: {lang!r}")
+
+
+# ---------------------------------------------------------------------------
 # Domain models (classes wrapping sqlite3.Row + Storage)
 # ---------------------------------------------------------------------------
 
@@ -337,11 +356,12 @@ class Concept:
         return self._pos
 
     def definition(self, lang: str = "en") -> AnnotatedString | None:
-        """Returns the definition of this concept in the given language if available."""
+        """Returns the definition of this concept in the given language (ISO code) if available."""
+        _valid_lang_code(lang,self._storage)
         row = _select_one(self._storage, _SQL_DEFINITION, (self._rowid, lang))
         if row is None:  
             return AnnotatedString(
-            text="No definition available in the chosen language.",
+            text=None,
             lang="",
             offsets=[],
             storage=self._storage,
@@ -354,23 +374,29 @@ class Concept:
             storage=self._storage,
         )
 
-    def senses(self, lang: str | None = None) -> list[Sense]:
-        """Returns all senses linked to this concept, optionally filtered by language."""
+    def senses(self, langs: list[str] | str | None = None) -> list[Sense]:
+        """Returns all senses linked to this concept, optionally filtered by language(s)."""
         sql = _SQL_SENSES_BY_CONCEPT
         params: list[object] = [self._rowid]
-        if lang is not None:
-            sql += " AND languages.code = ?"
-            params.append(lang)
+        _valid_lang_code(langs,self._storage)
+        if langs:
+            langs = [langs] if isinstance(langs, str) else list(langs)        
+            placeholders = ",".join("?" * len(langs))
+            sql += f" AND languages.code IN ({placeholders})"                
+            params.extend(langs)
         rows = _select(self._storage, sql + " ORDER BY senses.sense_index, senses.rowid", params)
         return [Sense(row, self._storage) for row in rows]
 
-    def lexemes(self, lang: str | None = None) -> list[Lexeme]:
-        """Returns all lexemes linked to senses of this concept, optionally filtered by language."""
+    def lexemes(self, langs: list[str] | str | None = None) -> list[Lexeme]:        
+        """Returns all lexemes linked to senses of this concept, optionally filtered by language(s)."""
         sql = _SQL_LEXEMES_BY_CONCEPT
         params: list[object] = [self._rowid]
-        if lang is not None:
-            sql += " AND languages.code = ?"
-            params.append(lang)
+        _valid_lang_code(langs,self._storage)
+        if langs:
+            langs = [langs] if isinstance(langs, str) else list(langs)             
+            placeholders = ",".join("?" * len(langs))
+            sql += f" AND languages.code IN ({placeholders})"                
+            params.extend(langs)
         rows = _select(self._storage, sql + " ORDER BY senses.entry_rowid ASC", params)
         return [Lexeme(row, self._storage) for row in rows]
 
@@ -442,7 +468,7 @@ class Sense:
         return str(self._rowid)
 
     def lang(self) -> str:        
-        """Returns the language code of this sense's lexeme."""
+        """Returns the language ISO code of this sense's lexeme."""
         return self._lang
 
     def examples(self) -> list[AnnotatedString]:
@@ -450,7 +476,7 @@ class Sense:
         rows = _select(self._storage, _SQL_EXAMPLES, (self._rowid,))
         if len(rows)==0:
             return [AnnotatedString(
-                text="No example available for this sense!",
+                text=None,
                 lang="",
                 offsets=[],
                 storage=self._storage,
@@ -512,7 +538,7 @@ class Lexeme:
         return str(self._rowid)
 
     def lang(self) -> str:
-        """Returns the language code of this lexeme."""
+        """Returns the ISO language code of this lexeme."""
         if not self._lang:
             row = _language_cached(self._storage, self._rowid)
             if row is None:
@@ -530,7 +556,7 @@ class Lexeme:
         return self._lemma
 
     def all_forms(self) -> list[str]:
-        """Returns all inflected forms of this lexeme (including the lemma)."""
+        """Returns all forms of this lexeme, lemma first, in the order given by the source wordnet."""
         rows = _select(self._storage, _SQL_FORMS_BY_ENTRY, (self._rowid,))
         return [str(row["form"]) for row in rows]
 
@@ -566,15 +592,15 @@ class AnnotatedString:
         return f"AnnotatedString({self._text!r})"
 
     def text(self) -> str:
-        """Return the plain text content of this string."""
+        """Returns the plain text content of this string."""
         return self._text
 
     def lang(self) -> str:
-        """Return the language code of the language this string is in."""
+        """Returns the language code of the language this string is in."""
         return self._lang
 
     def sense_offsets(self) -> list[tuple[Sense, int, int]]:
-        """Return a list of (sense, start, end) tuples marking annotated spans within the text."""
+        """Returns a list of (sense, start, end) tuples marking annotated spans within the text."""
         result: list[tuple[Sense, int, int]] = []
         for sense_rowid, start, end in self._offsets:
             row = _sense_cached(str(self._storage.path), self._storage, sense_rowid)
@@ -608,8 +634,8 @@ class Cygnet:
 
     Example:
         >>> from cyg import Cygnet
-        >>> cyg = Cygnet()
-        >>> nouns = cyg.concepts(pos="noun")
+        >>> db = Cygnet()
+        >>> nouns = db.concepts(pos="noun")
         >>> len(nouns) > 0
         True
     """
@@ -630,45 +656,7 @@ class Cygnet:
     def db_path(self) -> str:
         """The resolved path of the local database file."""
         return str(self._storage.path)
-
-    def releases(self, *, timeout: int = DOWNLOAD_TIMEOUT) -> list[str]:
-        """Return the tags of the Cygnet database releases available upstream.
-
-        Args:
-            timeout: Seconds to wait for the GitHub API request.
-
-        Returns:
-            The release tags, newest first.
-        """
-        return self._storage.releases(timeout=timeout)
-
-    def latest_version(self, *, timeout: int = DOWNLOAD_TIMEOUT) -> str:
-        """Return the tag of the newest database release available upstream.
-
-        Args:
-            timeout: Seconds to wait for the GitHub API request.
-
-        Returns:
-            The newest release tag, e.g. ``"2026.05.12"``.
-        """
-        return self._storage.latest_release(timeout=timeout)
-
-    def current_version(self) -> str | None:
-        """Return the release tag the local database was downloaded from.
-
-        Returns:
-            The recorded release tag, or ``None`` when the database was
-            installed manually (no release sidecar exists).
-        """
-        return self._storage.current_release()
-
-    def upgrade(self, version: str | None = None, *, timeout: int = DOWNLOAD_TIMEOUT) -> str:
-        """Install the newest database release (or ``version``) and reopen.
-
-        Returns:
-            The installed release tag.
-        """
-        return self._storage.upgrade(version=version, timeout=timeout)
+  
 
     def concepts(
         self,
@@ -678,7 +666,7 @@ class Cygnet:
         startswith: str | None = None,
         contains: str | None = None,
     ) -> list[Concept]:
-        """Return all concepts, optionally filtered."""
+        """Returns all concepts, optionally filtered by form, language(s) and/or pos."""
         sql, params = _assemble_where(
             _SQL_CONCEPTS,
             form=form,
@@ -687,6 +675,7 @@ class Cygnet:
             startswith=startswith,
             contains=contains,
         )
+        _valid_lang_code(langs,self._storage)        
         rows = _select(self._storage, sql + " ORDER BY synsets.rowid ASC", params)
         return [Concept(row, self._storage) for row in rows]
 
@@ -704,7 +693,7 @@ class Cygnet:
         startswith: str | None = None,
         contains: str | None = None,
     ) -> list[Sense]:
-        """Return all senses, optionally filtered."""
+        """Returns all senses, optionally filtered by form and or languages(s)."""
         sql, params = _assemble_where(
             _SQL_SENSES,
             form=form,
@@ -713,6 +702,7 @@ class Cygnet:
             startswith=startswith,
             contains=contains,
         )
+        _valid_lang_code(langs,self._storage)
         rows = _select(self._storage, sql + " ORDER BY senses.sense_index, senses.rowid", params)
         return [Sense(row, self._storage) for row in rows]
 
@@ -723,7 +713,7 @@ class Cygnet:
         startswith: str | None = None,
         contains: str | None = None,
     ) -> list[Lexeme]:
-        """Return all lexemes, optionally filtered."""
+        """Returns all lexemes, optionally filtered by forma and/or languages."""
         sql, params = _assemble_where(
             _SQL_LEXEMES,
             form=form,
@@ -732,15 +722,16 @@ class Cygnet:
             startswith=startswith,
             contains=contains,
         )
+        _valid_lang_code(langs,self._storage)
         rows = _select(self._storage, sql + " ORDER BY entries.rowid ASC", params)
         return [Lexeme(row, self._storage) for row in rows]
 
-    def langs(self) -> list[str]:
-        """Return the sorted list of language codes in the database."""
-        return [row[0] for row in _select(self._storage, _SQL_LANGUAGES)]
+    def langs(self) -> dict[str,str]:
+        """Returns a dictionary mapping the languages featured in the database to their ISO language codes."""
+        return dict( _select(self._storage, _SQL_LANGUAGES))
 
     def close(self) -> None:
-        """Close the underlying SQLite connection."""
+        """Closes the underlying SQLite connection."""
         self._storage.close()
 
     def __enter__(self) -> Cygnet:

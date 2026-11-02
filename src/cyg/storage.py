@@ -135,9 +135,13 @@ class Storage:
    
 
         if path is not None and path.exists():
-            self._path = path
+            self._path = path            
+            if self._version != self.latest_release():  
+                print ("A new version of the Cygnet database with tag "+ self.latest_release() +" has been released and needs to be downloaded.")              
+                self.upgrade()
+                print ("Cygnet database successfully upgraded.")
             self._validate()
-            self._connect()
+            self._connect()           
             return
 
         if not download:
@@ -153,7 +157,9 @@ class Storage:
 
         self._path = path
         tag = self._version if self._version is not None else self.latest_release()
+        print ("Downloading the Cygnet database...")
         self._install_release(self._path, tag, timeout=DOWNLOAD_TIMEOUT)
+        print ("Cygnet database successfully downloaded.")
         self._validate()
         self._connect()
         
@@ -263,7 +269,7 @@ class Storage:
     # ------------------------------------------------------------------
     # release / version management
     # ------------------------------------------------------------------
-
+    
     @classmethod
     def _fetch_json(cls, url: str, *, timeout: int = DOWNLOAD_TIMEOUT) -> Any:
         """Fetch and decode a JSON payload from ``url``.
@@ -278,27 +284,7 @@ class Storage:
         except (urllib.error.URLError, OSError, ValueError) as exc:
             raise DownloadError(f"Could not fetch releases from {url}: {exc}") from exc
 
-    def releases(self, *, timeout: int = DOWNLOAD_TIMEOUT) -> list[str]:
-        """Return the tags of the releases available upstream, newest first.
-
-        Args:
-            timeout: Seconds to wait for the GitHub API request.
-
-        Returns:
-            The release tags, e.g. ``["2026.05.12", "2026.03.01", ...]``.
-
-        Raises:
-            DownloadError: If the releases cannot be listed.
-        """
-        data = self._fetch_json(RELEASES_API + "?per_page=100", timeout=timeout)
-        if not isinstance(data, list):
-            raise DownloadError(f"Unexpected response from {RELEASES_API}")
-        return [
-            str(item["tag_name"])
-            for item in data
-            if isinstance(item, dict) and item.get("tag_name")
-        ]
-
+    
     def latest_release(self, *, timeout: int = DOWNLOAD_TIMEOUT) -> str:
         """Return the tag of the newest upstream release.
 
@@ -316,26 +302,14 @@ class Storage:
         if not tag:
             raise DownloadError(f"No latest release found at {RELEASES_API}")
         return str(tag)
-
+ 
+    
     @staticmethod
     def _tag_path_for(db: Path) -> Path:
         """Return the path of the release-tag sidecar beside ``db``."""
         return Path(str(db) + RELEASE_TAG_SUFFIX)
 
-    def current_release(self) -> str | None:
-        """Return the release tag the local database was downloaded from.
-
-        Returns:
-            The recorded release tag, or ``None`` when the database was
-            installed manually (for example by the user directly) and no
-            sidecar file exists.
-        """
-        try:           
-            tag = self._tag_path_for(self._path).read_text(encoding="utf-8").strip()          
-        except OSError:
-            return None
-        return tag or None
-
+ 
     @staticmethod
     def _write_tag(db: Path, version: str) -> None:    
         """Record the release tag that produced the database at ``db``."""    
